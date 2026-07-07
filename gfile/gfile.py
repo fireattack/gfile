@@ -17,6 +17,14 @@ from requests_toolbelt import MultipartEncoder, StreamingIterator
 from tqdm import tqdm
 from urllib3.util.retry import Retry
 
+PRIMARY_DOMAIN = 'gigafile.jp'
+ALT_DOMAIN = 'gigafile.nu'
+
+
+def normalize_gigafile_url(url):
+    """Normalize a gigafile URL to use the primary domain (.jp)."""
+    return re.sub(r'\.gigafile\.nu\b', f'.{PRIMARY_DOMAIN}', url)
+
 
 def bytes_to_size_str(bytes):
    if bytes == 0:
@@ -81,6 +89,8 @@ def split_file(input_file, out, target_size=None, start=0, chunk_copy_size=1024*
 class GFile:
     def __init__(self, file_or_url, progress=False, thread_num=4, chunk_size=1024*1024*10, chunk_copy_size=1024*1024, timeout=10,
                  aria2=False, key=None, mute=False, verify=True, **kwargs) -> None:
+        if isinstance(file_or_url, str) and 'gigafile.nu' in file_or_url:
+            file_or_url = normalize_gigafile_url(file_or_url)
         self.file_or_url = file_or_url
         self.chunk_size = size_str_to_bytes(chunk_size)
         self.chunk_copy_size = size_str_to_bytes(chunk_copy_size)
@@ -178,7 +188,7 @@ class GFile:
             for i in range(self.thread_num):
                 self.pbar.append(tqdm(total=size, unit="B", unit_scale=True, leave=False, unit_divisor=1024, ncols=100, position=i))
 
-        self.server = re.search(r'var server = "(.+?)"', self.session.get('https://gigafile.nu/').text)[1]
+        self.server = re.search(r'var server = "(.+?)"', self.session.get(f'https://{PRIMARY_DOMAIN}/').text)[1]
 
         # upload the first chunk to set cookies properly.
         self.upload_chunk(0, chunks)
@@ -211,7 +221,7 @@ class GFile:
 
 
     def get_download_page(self):
-        uploaded_url = self.data['url']
+        uploaded_url = normalize_gigafile_url(self.data['url'])
 
         f = Path(self.file_or_url)
         f_size = f.stat().st_size
@@ -239,7 +249,7 @@ class GFile:
         """Fetch the real filename when it's masked in the HTML."""
         try:
             timestamp = int(time.time() * 1000) # not really required, but just to be safe
-            api_url = f'https://{server_id}x.gigafile.nu/get_uploaded_file_name_jx.php?file={file_id}&_={timestamp}'
+            api_url = f'https://{server_id}x.{PRIMARY_DOMAIN}/get_uploaded_file_name_jx.php?file={file_id}&_={timestamp}'
             r = self.session.get(api_url)
             r.raise_for_status()
             data = r.json()
@@ -252,10 +262,11 @@ class GFile:
 
 
     def parse_download_page(self, url):
-        m = re.search(r'^https?:\/\/(\d+?)\.gigafile\.nu\/([a-z0-9-]+)$', url)
+        m = re.search(r'^https?:\/\/(\d+?)\.gigafile\.(?:jp|nu)\/([a-z0-9-]+)$', url)
         if not m:
             print(f'ERROR: Invalid URL: {url}. It should be a valid gigafile URL.')
             return
+        url = normalize_gigafile_url(url)
         server_id = m[1]
         file_id = m[2]
         r = self.session.get(url) # setup cookie

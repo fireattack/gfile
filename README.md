@@ -2,7 +2,7 @@
 
 # gfile
 
-A python CLI/module to download and upload from [gigafile](https://gigafile.nu/).
+A python CLI/module to download and upload from [gigafile](https://gigafile.jp/). (The original domain `gigafile.nu` is currently down.)
 
 Note: PyPI package name is `gigafile` since `gfile` wasn't available. Both CLI and module names are still `gfile`.
 
@@ -23,7 +23,7 @@ or
 ```bash
 $ gfile upload path/to/file
 
-$ gfile download https://66.gigafile.nu/0320-b36ec21d4a56b143537e12df7388a5367
+$ gfile download https://66.gigafile.jp/0320-b36ec21d4a56b143537e12df7388a5367
 
 $ gfile -h
 usage: Gfile [-h] [--version] [-p] [-o OUTPUT] [--aria2 [ARIA2]] [-n THREAD_NUM] [-s CHUNK_SIZE] [-m CHUNK_COPY_SIZE] [-t TIMEOUT] [-k KEY]
@@ -64,7 +64,7 @@ from gfile import GFile
 ```
 #### Download
 ```py
-filename = GFile('https://XX.gigafile.nu/YYY').download()
+filename = GFile('https://XX.gigafile.jp/YYY').download()
 ```
 
 #### Upload
