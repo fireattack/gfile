@@ -235,11 +235,29 @@ class GFile:
         return uploaded_url
 
 
+    def _fetch_real_filename(self, server_id, file_id, fallback_name):
+        """Fetch the real filename when it's masked in the HTML."""
+        try:
+            timestamp = int(time.time() * 1000) # not really required, but just to be safe
+            api_url = f'https://{server_id}x.gigafile.nu/get_uploaded_file_name_jx.php?file={file_id}&_={timestamp}'
+            r = self.session.get(api_url)
+            r.raise_for_status()
+            data = r.json()
+            if 'filename' in data and data['filename']:
+                return data['filename']
+        except Exception as ex:
+            if not self.mute:
+                print(f'Warning: Failed to fetch real filename for {file_id}. Using fallback name. Error: {ex}')
+        return fallback_name
+
+
     def parse_download_page(self, url):
-        m = re.search(r'^https?:\/\/\d+?\.gigafile\.nu\/([a-z0-9-]+)$', url)
+        m = re.search(r'^https?:\/\/(\d+?)\.gigafile\.nu\/([a-z0-9-]+)$', url)
         if not m:
             print(f'ERROR: Invalid URL: {url}. It should be a valid gigafile URL.')
             return
+        server_id = m[1]
+        file_id = m[2]
         r = self.session.get(url) # setup cookie
         files_info = []
         try:
@@ -250,11 +268,14 @@ class GFile:
                     web_name = ele.select_one('.matomete_file_info > span:nth-child(2)').text.strip()
                     file_id = re.search(r'download\(\d+, *\'(.+?)\'', ele.select_one('.download_panel_btn_dl')['onclick'])[1]
                     size_str = re.search(r'（(.+?)）', ele.select_one('.matomete_file_info > span:nth-child(3)').text.strip())[1]
+                    if '*' in web_name:
+                        web_name = self._fetch_real_filename(server_id, file_id, web_name)
                     files_info.append((web_name, size_str, file_id))
             else:
-                file_id = m[1]
                 size_str = soup.select_one('.dl_size').text.strip()
                 web_name = soup.select_one('#dl').text.strip()
+                if '*' in web_name:
+                    web_name = self._fetch_real_filename(server_id, file_id, web_name)
                 files_info.append((web_name, size_str, file_id))
         except Exception as ex:
             print(f'ERROR: Failed to parse the page {url}.')
