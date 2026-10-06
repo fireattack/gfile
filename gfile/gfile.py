@@ -319,10 +319,15 @@ class GFile:
             if self.key:
                 download_url += f'&dlkey={self.key}'
             if self.aria2:
+                # resolve the redirect manually so aria2 get the correct cookies
+                with self.session.get(download_url, stream=True) as response:
+                    response.raise_for_status()
+                    aria2_url = response.url
                 cookie_str = "; ".join([f"{cookie.name}={cookie.value}" for cookie in self.session.cookies])
-                cmd = ['aria2c', download_url, '--header', f'Cookie: {cookie_str}', '-o', filename]
+                cmd = ['aria2c', aria2_url, '--header', f'Cookie: {cookie_str}', '-o', filename]
                 cmd.extend(self.aria2.split(' '))
-                run(cmd)
+                run(cmd, check=True)
+                downloaded.append(filename)
                 continue
 
             temp = filename + '.dl'
